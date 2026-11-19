@@ -1,0 +1,53 @@
+name: Publish 261 retro HLCA college logos
+on:
+  push:
+    paths:
+      - '.github/workflows/rebrand-hlca-retro.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: rebrand-hlca-retro
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install image requirements
+        run: pip install pillow
+      - name: Render 261 new school-color retro marks with clean boundaries
+        run: python scripts/rebrand_261_retro.py
+      - name: Back up previous public logo set and publish retro designs
+        run: |
+          mkdir -p previous-logos-backup
+          cp -n logos/*.png previous-logos-backup/
+          cp retro_output/*.png logos/
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          paths=list(Path('logos').glob('*.png'))
+          assert len(paths)==261, len(paths)
+          for path in paths:
+              im=Image.open(path)
+              assert im.size==(256,256) and im.mode=='RGBA'
+              b=im.getchannel('A').getbbox()
+              assert b and min(b[0],b[1],256-b[2],256-b[3])>=11, (path.name,b)
+          assert len(list(Path('previous-logos-backup').glob('*.png')))==261
+          print('VERIFIED_261_RETRO_LOGOS',len(paths))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add logos previous-logos-backup
+          if git diff --cached --quiet; then
+            echo "All marks already up to date"
+          else
+            git commit -m "Replace 261 logos with school-inspired retro designs; preserve previous files"
+            git push origin HEAD:main
+          fi
