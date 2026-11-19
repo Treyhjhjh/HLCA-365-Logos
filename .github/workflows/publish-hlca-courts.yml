@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - .github/workflows/publish-hlca-courts.yml
+      - build_hlca_261_courts.py
+      - court_teams.csv
 
 permissions:
   contents: write
