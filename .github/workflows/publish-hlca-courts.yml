@@ -1,0 +1,61 @@
+name: Publish all 261 HLCA courts
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/publish-hlca-courts.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-hlca-courts
+  cancel-in-progress: false
+
+jobs:
+  publish-courts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install court image tools
+        run: python -m pip install --disable-pip-version-check pillow requests beautifulsoup4
+      - name: Rebuild all 261 courts from NCAA references and custom designs
+        run: python -u build_hlca_261_courts.py --community
+      - name: Validate court resolution, names and publish ZIP
+        run: |
+          python - <<'PY'
+          import csv,zipfile
+          from pathlib import Path
+          from PIL import Image
+          root=Path('.')
+          rows=list(csv.DictReader(open('court_teams.csv',encoding='utf-8')))
+          found=list(Path('courts').glob('*.png'))
+          assert len(rows)==261 and len(found)==261,(len(rows),len(found))
+          assert {r['court_filename'] for r in rows}=={p.name for p in found}
+          for p in found:
+              with Image.open(p) as im:
+                  assert im.format=='PNG' and im.size==(1024,512),(p,im.size)
+          output='HLCA_261_COURTS_1024x512.zip'
+          with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+              for p in sorted(found): z.write(p,'courts/'+p.name)
+              z.write('court_sources.csv')
+              z.write('court_teams.csv')
+          with zipfile.ZipFile(output) as z:
+              assert z.testzip() is None
+          print('Validated 261 courts at exactly 1024x512. ZIP:',Path(output).stat().st_size,flush=True)
+          PY
+      - name: Publish all images and source credits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- courts/ court_sources.csv HLCA_261_COURTS_1024x512.zip
+          if git diff --cached --quiet; then
+            echo "Published court art already matches output."
+          else
+            git commit -m "Publish all 261 team courts with NCAA community references"
+            git push origin HEAD:main
+          fi
