@@ -222,15 +222,14 @@ def adapt_community(team, src, logo):
         # Center overlay identity patch: retain community wood tone from the
         # adjacent in-bounds plank, then replace the real college center logo.
         # This is a purposeful composite, not AI enlargement.
-        center=(438,186,586,322)
-        source=im.crop((335,186,483,322))
-        # Sample where there is no existing midcourt art. If not usable, use
-        # average natural-wood fallback to avoid copying stale NCAA lettering.
-        for yy in range(186,323):
-            for xx in range(438,587):
-                sx=335 + ((xx-438)%148)
-                sy=186 + ((yy-186)%136)
-                im.putpixel((xx,yy),source.getpixel((sx-335,sy-186)))
+        # Wipe the original school's entire midcourt emblem, not just its
+        # central core; this prevents half-erased NCAA marks behind HLCA logos.
+        # Repeat a clean narrow hardwood strip left of the center circle at
+        # original pixel scale, preserving a consistent parquet texture.
+        patch=im.crop((380,152,396,360))
+        for yy in range(152,360):
+            for xx in range(396,629):
+                im.putpixel((xx,yy),patch.getpixel(((xx-396)%16,yy-152)))
         d=ImageDraw.Draw(im)
         line=rgba(team['team_primary'])
         d.line((512,95,512,418),fill=line,width=2)
@@ -238,6 +237,12 @@ def adapt_community(team, src, logo):
         vtext(im,team['hlca_name'],(149,255),fill=contrast)
         vtext(im,team['hlca_city'],(873,255),invert=True,fill=contrast)
         paste_logo(im,logo,512,255,150,124)
+        # Crop out nonstandard artwork outside the game's exact overlay frame.
+        # This keeps the original Hoop Land court footprint aligned.
+        from PIL import ImageChops
+        clip=Image.new('L',(1024,512),0)
+        ImageDraw.Draw(clip).rectangle((111,55,912,456),fill=255)
+        im.putalpha(ImageChops.multiply(im.getchannel('A'),clip))
         # Keep floor & remaining community design intact.
         return im
     except Exception as exc:
