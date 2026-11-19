@@ -50,11 +50,43 @@ jobs:
               assert z.testzip() is None
           print('Validated 261 courts at exactly 1024x512. ZIP:',Path(output).stat().st_size,flush=True)
           PY
+      - name: Create 261 center-logo-free pixel-preserving variants
+        run: |
+          python - <<'PY'
+          import csv,zipfile
+          from pathlib import Path
+          from PIL import Image, ImageChops, ImageDraw
+          paths=sorted(Path('courts').glob('*.png'))
+          dest=Path('courts_no_center')
+          dest.mkdir(exist_ok=True)
+          rect=(392,149,633,365)
+          for path in paths:
+              image=Image.open(path).convert('RGBA')
+              assert image.size==(1024,512)
+              output=image.copy()
+              wood=image.crop((380,149,396,365))
+              for x in range(rect[0],rect[2],16):
+                  width=min(16,rect[2]-x)
+                  output.paste(wood.crop((0,0,width,216)),(x,rect[1]))
+              centerline=image.getpixel((512,108))
+              ImageDraw.Draw(output).line((512,149,512,364),fill=centerline,width=2)
+              delta=ImageChops.difference(image,output).getbbox()
+              if delta:
+                  assert rect[0]<=delta[0]<delta[2]<=rect[2]
+                  assert rect[1]<=delta[1]<delta[3]<=rect[3]
+              output.save(dest/path.name,optimize=True)
+          assert len(list(dest.glob('*.png')))==261
+          with zipfile.ZipFile('HLCA_261_COURTS_NO_CENTER_LOGOS_1024x512.zip','w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
+              for path in sorted(dest.glob('*.png')): z.write(path,'courts_no_center/'+path.name)
+              z.write('court_sources.csv')
+              z.write('court_teams.csv')
+          print('Created 261 original-resolution center-logo-free court variants; outside region unchanged.')
+          PY
       - name: Publish all images and source credits
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- courts/ court_sources.csv HLCA_261_COURTS_1024x512.zip
+          git add -- courts/ courts_no_center/ court_sources.csv HLCA_261_COURTS_1024x512.zip HLCA_261_COURTS_NO_CENTER_LOGOS_1024x512.zip
           if git diff --cached --quiet; then
             echo "Published court art already matches output."
           else
