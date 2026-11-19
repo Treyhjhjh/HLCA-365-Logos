@@ -229,7 +229,7 @@ def adapt_community(team, src, logo):
         for yy in range(186,323):
             for xx in range(438,587):
                 sx=335 + ((xx-438)%148)
-                sy=186 + ((yy-186)%137)
+                sy=186 + ((yy-186)%136)
                 im.putpixel((xx,yy),source.getpixel((sx-335,sy-186)))
         d=ImageDraw.Draw(im)
         line=rgba(team['team_primary'])
