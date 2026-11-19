@@ -1,0 +1,37 @@
+name: Package exact live 261 retro HLCA logos
+on:
+  push:
+    paths:
+      - '.github/workflows/package-live-retro.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build verified public retro ZIP
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import struct
+          assets = sorted(Path("logos").glob("*.png"))
+          assert len(assets) == 261, len(assets)
+          for f in assets:
+              data=f.read_bytes()
+              assert data[:8]==b'\x89PNG\r\n\x1a\n'
+              w,h=struct.unpack('>II',data[16:24])
+              assert (w,h)==(256,256),(f.name,w,h)
+          path=Path("HLCA_261_RETRO_LIVE_LOGOS_256PX.zip")
+          with ZipFile(path,'w',ZIP_DEFLATED,compresslevel=6) as z:
+              for f in assets: z.write(f, f"logos/{f.name}")
+              assert z.testzip() is None
+          print("PACKAGED_LIVE_RETRO",len(assets),path.stat().st_size)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add HLCA_261_RETRO_LIVE_LOGOS_256PX.zip
+          git commit -m "Add download ZIP of exact live 261 retro logos"
+          git push origin HEAD:main
